@@ -443,6 +443,7 @@ module.exports = class kucoin extends Exchange {
             'id': orderId,
             'timestamp': timestamp,
             'datetime': this.iso8601 (timestamp),
+            'lastTradeTimestamp': undefined,
             'symbol': symbol,
             'type': 'limit',
             'side': side,
@@ -486,7 +487,7 @@ module.exports = class kucoin extends Exchange {
         return this.parseOrder (response['data'], market);
     }
 
-    async parseOrdersByStatus (orders, market, since, limit, status) {
+    parseOrdersByStatus (orders, market, since, limit, status) {
         let result = [];
         for (let i = 0; i < orders.length; i++) {
             let order = this.parseOrder (this.extend (orders[i], {
@@ -593,6 +594,7 @@ module.exports = class kucoin extends Exchange {
             'id': orderId,
             'timestamp': timestamp,
             'datetime': iso8601,
+            'lastTradeTimestamp': undefined,
             'symbol': market['symbol'],
             'type': type,
             'side': side,
@@ -687,10 +689,13 @@ module.exports = class kucoin extends Exchange {
             symbol = ticker['coinType'] + '/' + ticker['coinTypePair'];
         }
         // TNC coin doesn't have changerate for some reason
-        let change = this.safeFloat (ticker, 'changeRate');
-        if (typeof change !== 'undefined')
-            change *= 100;
+        let change = this.safeFloat (ticker, 'change');
         let last = this.safeFloat (ticker, 'lastDealPrice');
+        let open = undefined;
+        if (typeof last !== 'undefined')
+            if (typeof change !== 'undefined')
+                open = last - change;
+        let changePercentage = this.safeFloat (ticker, 'changeRate');
         return {
             'symbol': symbol,
             'timestamp': timestamp,
@@ -702,12 +707,12 @@ module.exports = class kucoin extends Exchange {
             'ask': this.safeFloat (ticker, 'sell'),
             'askVolume': undefined,
             'vwap': undefined,
-            'open': undefined,
+            'open': open,
             'close': last,
             'last': last,
             'previousClose': undefined,
             'change': change,
-            'percentage': undefined,
+            'percentage': changePercentage,
             'average': undefined,
             'baseVolume': this.safeFloat (ticker, 'vol'),
             'quoteVolume': this.safeFloat (ticker, 'volValue'),
@@ -769,11 +774,15 @@ module.exports = class kucoin extends Exchange {
             amount = this.safeFloat (trade, 'amount');
             cost = this.safeFloat (trade, 'dealValue');
             let feeCurrency = undefined;
-            if ('coinType' in trade) {
-                feeCurrency = this.safeString (trade, 'coinType');
-                if (typeof feeCurrency !== 'undefined')
+            if (typeof market !== 'undefined') {
+                feeCurrency = (side === 'sell') ? market['quote'] : market['base'];
+            } else {
+                let feeCurrencyField = (side === 'sell') ? 'coinTypePair' : 'coinType';
+                let feeCurrency = this.safeString (order, feeCurrencyField);
+                if (typeof feeCurrency !== 'undefined') {
                     if (feeCurrency in this.currencies_by_id)
                         feeCurrency = this.currencies_by_id[feeCurrency]['code'];
+                }
             }
             fee = {
                 'cost': this.safeFloat (trade, 'fee'),
