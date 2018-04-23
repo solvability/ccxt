@@ -399,6 +399,10 @@ class binance (Exchange):
         return self.parse_balance(result)
 
     def fetch_order_book(self, symbol, limit=None, params={}):
+        allowed_limits = [5, 10, 20, 50, 100, 500, 1000]
+        if limit is not None:
+            limit_original = limit
+            limit = [x for x in allowed_limits if x>=limit][0]
         self.load_markets()
         market = self.market(symbol)
         request = {
@@ -407,6 +411,9 @@ class binance (Exchange):
         if limit is not None:
             request['limit'] = limit  # default = maximum = 100
         response = self.publicGetDepth(self.extend(request, params))
+        if limit is not None:
+            response['bids'] = response['bids'][:limit_original]
+            response['asks'] = response['asks'][:limit_original]
         orderbook = self.parse_order_book(response)
         orderbook['nonce'] = self.safe_integer(response, 'lastUpdateId')
         return orderbook
@@ -567,10 +574,12 @@ class binance (Exchange):
         price = self.safe_float(order, 'price')
         amount = self.safe_float(order, 'origQty')
         filled = self.safe_float(order, 'executedQty', 0.0)
-        remaining = max(amount - filled, 0.0)
+        remaining = None
         cost = None
-        if price is not None:
-            if filled is not None:
+        if filled is not None:
+            if amount is not None:
+                remaining = max(amount - filled, 0.0)
+            if price is not None:
                 cost = price * filled
         id = self.safe_string(order, 'orderId')
         type = self.safe_string(order, 'type')
@@ -584,6 +593,7 @@ class binance (Exchange):
             'id': id,
             'timestamp': timestamp,
             'datetime': iso8601,
+            'lastTradeTimestamp': None,
             'symbol': symbol,
             'type': type,
             'side': side,

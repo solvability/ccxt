@@ -4,7 +4,7 @@
 
 # -----------------------------------------------------------------------------
 
-__version__ = '1.12.154'
+__version__ = '1.13.27'
 
 # -----------------------------------------------------------------------------
 
@@ -137,6 +137,7 @@ class Exchange(object):
         'uid': False,
         'login': False,
         'password': False,
+        'twofa': False,  # 2-factor authentication (one-time password key)
     }
 
     # API method metainfo
@@ -550,7 +551,7 @@ class Exchange(object):
 
     @staticmethod
     def sort_by(array, key, descending=False):
-        return sorted(array, key=lambda k: k[key], reverse=descending)
+        return sorted(array, key=lambda k: k[key] if k[key] is not None else "", reverse=descending)
 
     @staticmethod
     def array_concat(a, b):
@@ -900,7 +901,7 @@ class Exchange(object):
         return self.fees
 
     def fetch_markets(self):
-        return self.markets
+        return self.to_array(self.markets)
 
     def fetch_fees(self):
         trading = {}

@@ -22,12 +22,11 @@ class bittrex extends Exchange {
                 'CORS' => true,
                 'createMarketOrder' => false,
                 'fetchDepositAddress' => true,
-                'fetchClosedOrders' => 'emulated',
+                'fetchClosedOrders' => true,
                 'fetchCurrencies' => true,
                 'fetchMyTrades' => false,
                 'fetchOHLCV' => true,
                 'fetchOrder' => true,
-                'fetchOrders' => true,
                 'fetchOpenOrders' => true,
                 'fetchTickers' => true,
                 'withdraw' => true,
@@ -138,6 +137,7 @@ class bittrex extends Exchange {
                 ),
             ),
             'exceptions' => array (
+                'Call to Cancel was throttled. Try again in 60 seconds.' => '\\ccxt\\DDoSProtection',
                 'APISIGN_NOT_PROVIDED' => '\\ccxt\\AuthenticationError',
                 'INVALID_SIGNATURE' => '\\ccxt\\AuthenticationError',
                 'INVALID_CURRENCY' => '\\ccxt\\ExchangeError',
@@ -521,10 +521,12 @@ class bittrex extends Exchange {
         $timestamp = null;
         if (is_array ($order) && array_key_exists ('Opened', $order))
             $timestamp = $this->parse8601 ($order['Opened'] . '+00:00');
-        if (is_array ($order) && array_key_exists ('TimeStamp', $order))
-            $timestamp = $this->parse8601 ($order['TimeStamp'] . '+00:00');
         if (is_array ($order) && array_key_exists ('Created', $order))
             $timestamp = $this->parse8601 ($order['Created'] . '+00:00');
+        $iso8601 = ($timestamp !== null) ? $this->iso8601 ($timestamp) : null;
+        $lastTradeTimestamp = null;
+        if ((is_array ($order) && array_key_exists ('TimeStamp', $order)) && ($order['TimeStamp'] != null))
+            $lastTradeTimestamp = $this->parse8601 ($order['TimeStamp'] . '+00:00');
         $fee = null;
         $commission = null;
         if (is_array ($order) && array_key_exists ('Commission', $order)) {
@@ -560,7 +562,8 @@ class bittrex extends Exchange {
             'info' => $order,
             'id' => $id,
             'timestamp' => $timestamp,
-            'datetime' => $this->iso8601 ($timestamp),
+            'datetime' => $iso8601,
+            'lastTradeTimestamp' => $lastTradeTimestamp,
             'symbol' => $symbol,
             'type' => 'limit',
             'side' => $side,
@@ -595,7 +598,7 @@ class bittrex extends Exchange {
         return $this->parse_order($response['result']);
     }
 
-    public function fetch_orders ($symbol = null, $since = null, $limit = null, $params = array ()) {
+    public function fetch_closed_orders ($symbol = null, $since = null, $limit = null, $params = array ()) {
         $this->load_markets();
         $request = array ();
         $market = null;
@@ -608,11 +611,6 @@ class bittrex extends Exchange {
         if ($symbol)
             return $this->filter_by_symbol($orders, $symbol);
         return $orders;
-    }
-
-    public function fetch_closed_orders ($symbol = null, $since = null, $limit = null, $params = array ()) {
-        $orders = $this->fetch_orders($symbol, $since, $limit, $params);
-        return $this->filter_by($orders, 'status', 'closed');
     }
 
     public function fetch_deposit_address ($code, $params = array ()) {

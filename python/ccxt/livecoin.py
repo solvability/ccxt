@@ -102,6 +102,7 @@ class livecoin (Exchange):
                 },
             },
             'commonCurrencies': {
+                'CPC': 'Capricoin',
                 'CRC': 'CryCash',
                 'ORE': 'Orectic',
                 'RUR': 'RUB',
@@ -411,6 +412,7 @@ class livecoin (Exchange):
             'id': order['id'],
             'timestamp': timestamp,
             'datetime': self.iso8601(timestamp),
+            'lastTradeTimestamp': None,
             'status': status,
             'symbol': symbol,
             'type': type,

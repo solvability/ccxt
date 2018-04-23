@@ -85,6 +85,7 @@ class livecoin extends Exchange {
                 ),
             ),
             'commonCurrencies' => array (
+                'CPC' => 'Capricoin',
                 'CRC' => 'CryCash',
                 'ORE' => 'Orectic',
                 'RUR' => 'RUB',
@@ -415,6 +416,7 @@ class livecoin extends Exchange {
             'id' => $order['id'],
             'timestamp' => $timestamp,
             'datetime' => $this->iso8601 ($timestamp),
+            'lastTradeTimestamp' => null,
             'status' => $status,
             'symbol' => $symbol,
             'type' => $type,
