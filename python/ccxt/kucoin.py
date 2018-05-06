@@ -59,7 +59,7 @@ class kucoin (Exchange):
                     'kitchen': 'https://kitchen.kucoin.com',
                     'kitchen-2': 'https://kitchen-2.kucoin.com',
                 },
-                'www': 'https://kucoin.com',
+                'www': 'https://www.kucoin.com/#/?r=E5wkqe',
                 'doc': 'https://kucoinapidocs.docs.apiary.io',
                 'fees': 'https://news.kucoin.com/en/fee',
             },
@@ -795,17 +795,8 @@ class kucoin (Exchange):
         response = self.privateGetDealOrders(self.extend(request, params))
         return self.parse_trades(response['data']['datas'], market, since, limit)
 
-    def parse_trading_view_ohlc_vs(self, ohlcvs, market=None, timeframe='1m', since=None, limit=None):
-        result = []
-        for i in range(0, len(ohlcvs['t'])):
-            result.append([
-                ohlcvs['t'][i] * 1000,
-                ohlcvs['o'][i],
-                ohlcvs['h'][i],
-                ohlcvs['l'][i],
-                ohlcvs['c'][i],
-                ohlcvs['v'][i],
-            ])
+    def parse_trading_view_ohlcv(self, ohlcvs, market=None, timeframe='1m', since=None, limit=None):
+        result = self.convert_trading_view_to_ohlcv(ohlcvs)
         return self.parse_ohlcvs(result, market, timeframe, since, limit)
 
     def fetch_ohlcv(self, symbol, timeframe='1m', since=None, limit=None, params={}):
@@ -841,7 +832,7 @@ class kucoin (Exchange):
             'to': end,
         }
         response = self.publicGetOpenChartHistory(self.extend(request, params))
-        return self.parse_trading_view_ohlc_vs(response, market, timeframe, since, limit)
+        return self.parse_trading_view_ohlcv(response, market, timeframe, since, limit)
 
     def withdraw(self, code, amount, address, tag=None, params={}):
         self.check_address(address)
@@ -918,6 +909,8 @@ class kucoin (Exchange):
                 raise InvalidOrder(feedback)  # amount < limits.amount.min
             if message.find('Min price:') >= 0:
                 raise InvalidOrder(feedback)  # price < limits.price.min
+            if message.find('Max price:') >= 0:
+                raise InvalidOrder(feedback)  # price > limits.price.max
             if message.find('The precision of price') >= 0:
                 raise InvalidOrder(feedback)  # price violates precision.price
         elif code == 'NO_BALANCE':

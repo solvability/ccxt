@@ -50,7 +50,7 @@ class kucoin extends Exchange {
                     'kitchen' => 'https://kitchen.kucoin.com',
                     'kitchen-2' => 'https://kitchen-2.kucoin.com',
                 ),
-                'www' => 'https://kucoin.com',
+                'www' => 'https://www.kucoin.com/#/?r=E5wkqe',
                 'doc' => 'https://kucoinapidocs.docs.apiary.io',
                 'fees' => 'https://news.kucoin.com/en/fee',
             ),
@@ -836,18 +836,8 @@ class kucoin extends Exchange {
         return $this->parse_trades($response['data']['datas'], $market, $since, $limit);
     }
 
-    public function parse_trading_view_ohlc_vs ($ohlcvs, $market = null, $timeframe = '1m', $since = null, $limit = null) {
-        $result = array ();
-        for ($i = 0; $i < count ($ohlcvs['t']); $i++) {
-            $result[] = [
-                $ohlcvs['t'][$i] * 1000,
-                $ohlcvs['o'][$i],
-                $ohlcvs['h'][$i],
-                $ohlcvs['l'][$i],
-                $ohlcvs['c'][$i],
-                $ohlcvs['v'][$i],
-            ];
-        }
+    public function parse_trading_view_ohlcv ($ohlcvs, $market = null, $timeframe = '1m', $since = null, $limit = null) {
+        $result = $this->convert_trading_view_to_ohlcv($ohlcvs);
         return $this->parse_ohlcvs($result, $market, $timeframe, $since, $limit);
     }
 
@@ -886,7 +876,7 @@ class kucoin extends Exchange {
             'to' => $end,
         );
         $response = $this->publicGetOpenChartHistory (array_merge ($request, $params));
-        return $this->parse_trading_view_ohlc_vs ($response, $market, $timeframe, $since, $limit);
+        return $this->parse_trading_view_ohlcv ($response, $market, $timeframe, $since, $limit);
     }
 
     public function withdraw ($code, $amount, $address, $tag = null, $params = array ()) {
@@ -969,6 +959,8 @@ class kucoin extends Exchange {
                 throw new InvalidOrder ($feedback); // amount < limits.amount.min
             if (mb_strpos ($message, 'Min price:') !== false)
                 throw new InvalidOrder ($feedback); // price < limits.price.min
+            if (mb_strpos ($message, 'Max price:') !== false)
+                throw new InvalidOrder ($feedback); // price > limits.price.max
             if (mb_strpos ($message, 'The precision of price') !== false)
                 throw new InvalidOrder ($feedback); // price violates precision.price
         } else if ($code === 'NO_BALANCE') {

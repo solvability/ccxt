@@ -252,16 +252,16 @@ class okcoinusd (Exchange):
                     market = self.markets_by_id[marketId]
         if market:
             symbol = market['symbol']
-        last = float(ticker['last'])
+        last = self.safe_float(ticker, 'last')
         return {
             'symbol': symbol,
             'timestamp': timestamp,
             'datetime': self.iso8601(timestamp),
-            'high': float(ticker['high']),
-            'low': float(ticker['low']),
-            'bid': float(ticker['buy']),
+            'high': self.safe_float(ticker, 'high'),
+            'low': self.safe_float(ticker, 'low'),
+            'bid': self.safe_float(ticker, 'buy'),
             'bidVolume': None,
-            'ask': float(ticker['sell']),
+            'ask': self.safe_float(ticker, 'sell'),
             'askVolume': None,
             'vwap': None,
             'open': None,
@@ -271,7 +271,7 @@ class okcoinusd (Exchange):
             'change': None,
             'percentage': None,
             'average': None,
-            'baseVolume': float(ticker['vol']),
+            'baseVolume': self.safe_float(ticker, 'vol'),
             'quoteVolume': None,
             'info': ticker,
         }
@@ -310,8 +310,8 @@ class okcoinusd (Exchange):
             'order': None,
             'type': None,
             'side': trade['type'],
-            'price': float(trade['price']),
-            'amount': float(trade['amount']),
+            'price': self.safe_float(trade, 'price'),
+            'amount': self.safe_float(trade, 'amount'),
         }
 
     def fetch_trades(self, symbol, since=None, limit=None, params={}):
@@ -399,9 +399,24 @@ class okcoinusd (Exchange):
         params = self.omit(params, 'cost')
         method += 'Trade'
         response = getattr(self, method)(self.extend(order, params))
+        timestamp = self.milliseconds()
         return {
             'info': response,
             'id': str(response['order_id']),
+            'timestamp': timestamp,
+            'datetime': self.iso8601(timestamp),
+            'lastTradeTimestamp': None,
+            'status': None,
+            'symbol': symbol,
+            'type': type,
+            'side': side,
+            'price': price,
+            'amount': amount,
+            'filled': None,
+            'remaining': None,
+            'cost': None,
+            'trades': None,
+            'fee': None,
         }
 
     def cancel_order(self, id, symbol=None, params={}):
@@ -431,6 +446,8 @@ class okcoinusd (Exchange):
             return 'open'
         if status == 2:
             return 'closed'
+        if status == 3:
+            return 'open'
         if status == 4:
             return 'canceled'
         return status
@@ -603,7 +620,7 @@ class okcoinusd (Exchange):
             'symbol': currencyId,
             'withdraw_address': address,
             'withdraw_amount': amount,
-            'target': 'address',  # or okcn, okcom, okex
+            'target': 'address',  # or 'okcn', 'okcom', 'okex'
         }
         query = params
         if 'chargefee' in query:

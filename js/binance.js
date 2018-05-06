@@ -256,6 +256,7 @@ module.exports = class binance extends Exchange {
             },
             // exchange-specific options
             'options': {
+                'hasAlreadyAuthenticatedSuccessfully': false,
                 'warnOnFetchOpenOrdersWithoutSymbol': true,
                 'recvWindow': 5 * 1000, // 5 sec, binance default
                 'timeDifference': 0, // the difference between system clock and Binance clock
@@ -341,17 +342,17 @@ module.exports = class binance extends Exchange {
                 let filter = filters['PRICE_FILTER'];
                 entry['precision']['price'] = this.precisionFromString (filter['tickSize']);
                 entry['limits']['price'] = {
-                    'min': parseFloat (filter['minPrice']),
-                    'max': parseFloat (filter['maxPrice']),
+                    'min': this.safeFloat (filter, 'minPrice'),
+                    'max': this.safeFloat (filter, 'maxPrice'),
                 };
             }
             if ('LOT_SIZE' in filters) {
                 let filter = filters['LOT_SIZE'];
                 entry['precision']['amount'] = this.precisionFromString (filter['stepSize']);
-                entry['lot'] = parseFloat (filter['stepSize']); // lot size is deprecated as of 2018.02.06
+                entry['lot'] = this.safeFloat (filter, 'stepSize'); // lot size is deprecated as of 2018.02.06
                 entry['limits']['amount'] = {
-                    'min': parseFloat (filter['minQty']),
-                    'max': parseFloat (filter['maxQty']),
+                    'min': this.safeFloat (filter, 'minQty'),
+                    'max': this.safeFloat (filter, 'maxQty'),
                 };
             }
             if ('MIN_NOTIONAL' in filters) {
@@ -484,16 +485,17 @@ module.exports = class binance extends Exchange {
         ];
     }
 
-    async fetchOHLCV (symbol, timeframe = '1m', since = undefined, limit = 500, params = {}) {
+    async fetchOHLCV (symbol, timeframe = '1m', since = undefined, limit = undefined, params = {}) {
         await this.loadMarkets ();
         let market = this.market (symbol);
         let request = {
             'symbol': market['id'],
             'interval': this.timeframes[timeframe],
-            'limit': limit, // default == max == 500
         };
         if (typeof since !== 'undefined')
             request['startTime'] = since;
+        if (typeof limit !== 'undefined')
+            request['limit'] = limit; // default == max == 500
         let response = await this.publicGetKlines (this.extend (request, params));
         return this.parseOHLCVs (response, market, timeframe, since, limit);
     }
@@ -519,10 +521,13 @@ module.exports = class binance extends Exchange {
         let fee = undefined;
         if ('commission' in trade) {
             fee = {
-                'cost': parseFloat (trade['commission']),
+                'cost': this.safeFloat (trade, 'commission'),
                 'currency': this.commonCurrencyCode (trade['commissionAsset']),
             };
         }
+        let takerOrMaker = undefined;
+        if ('isMaker' in trade)
+            takerOrMaker = trade['isMaker'] ? 'maker' : 'taker';
         return {
             'info': trade,
             'timestamp': timestamp,
@@ -531,6 +536,7 @@ module.exports = class binance extends Exchange {
             'id': id,
             'order': order,
             'type': undefined,
+            'takerOrMaker': takerOrMaker,
             'side': side,
             'price': price,
             'cost': price * amount,
@@ -860,6 +866,12 @@ module.exports = class binance extends Exchange {
                 if (typeof error !== 'undefined') {
                     const exceptions = this.exceptions;
                     if (error in exceptions) {
+                        // a workaround for {"code":-2015,"msg":"Invalid API-key, IP, or permissions for action."}
+                        // despite that their message is very confusing, it is raised by Binance
+                        // on a temporary ban (the API key is valid, but disabled for a while)
+                        if ((error === '-2015') && this.options['hasAlreadyAuthenticatedSuccessfully']) {
+                            throw new DDoSProtection (this.id + ' temporary banned: ' + body);
+                        }
                         throw new exceptions[error] (this.id + ' ' + body);
                     } else {
                         throw new ExchangeError (this.id + ': unknown error code: ' + body + ' ' + error);
@@ -870,5 +882,13 @@ module.exports = class binance extends Exchange {
                 }
             }
         }
+    }
+
+    async request (path, api = 'public', method = 'GET', params = {}, headers = undefined, body = undefined) {
+        let response = await this.fetch2 (path, api, method, params, headers, body);
+        // a workaround for {"code":-2015,"msg":"Invalid API-key, IP, or permissions for action."}
+        if ((api === 'private') || (api === 'wapi'))
+            this.options['hasAlreadyAuthenticatedSuccessfully'] = true;
+        return response;
     }
 };

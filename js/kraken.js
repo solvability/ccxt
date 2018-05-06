@@ -432,7 +432,7 @@ module.exports = class kraken extends Exchange {
             'ask': parseFloat (ticker['a'][0]),
             'askVolume': undefined,
             'vwap': vwap,
-            'open': parseFloat (ticker['o']),
+            'open': this.safeFloat (ticker, 'o'),
             'close': last,
             'last': last,
             'previousClose': undefined,
@@ -527,14 +527,14 @@ module.exports = class kraken extends Exchange {
             timestamp = parseInt (trade['time'] * 1000);
             side = trade['type'];
             type = trade['ordertype'];
-            price = parseFloat (trade['price']);
-            amount = parseFloat (trade['vol']);
+            price = this.safeFloat (trade, 'price');
+            amount = this.safeFloat (trade, 'vol');
             if ('fee' in trade) {
                 let currency = undefined;
                 if (market)
                     currency = market['quote'];
                 fee = {
-                    'cost': parseFloat (trade['fee']),
+                    'cost': this.safeFloat (trade, 'fee'),
                     'currency': currency,
                 };
             }
@@ -560,6 +560,7 @@ module.exports = class kraken extends Exchange {
             'side': side,
             'price': price,
             'amount': amount,
+            'cost': price * amount,
             'fee': fee,
         };
     }
@@ -653,8 +654,8 @@ module.exports = class kraken extends Exchange {
         if (!market)
             market = this.findMarketByAltnameOrId (description['pair']);
         let timestamp = parseInt (order['opentm'] * 1000);
-        let amount = parseFloat (order['vol']);
-        let filled = parseFloat (order['vol_exec']);
+        let amount = this.safeFloat (order, 'vol');
+        let filled = this.safeFloat (order, 'vol_exec');
         let remaining = amount - filled;
         let fee = undefined;
         let cost = this.safeFloat (order, 'cost');
@@ -737,6 +738,9 @@ module.exports = class kraken extends Exchange {
         for (let i = 0; i < ids.length; i++) {
             trades[ids[i]]['id'] = ids[i];
         }
+        // let market = undefined;
+        // if (typeof symbol !== 'undefined')
+        //     market = this.market (symbol);
         return this.parseTrades (trades, undefined, since, limit);
     }
 
@@ -809,7 +813,7 @@ module.exports = class kraken extends Exchange {
             if (this.options['cacheDepositMethodsOnFetchDepositAddress']) {
                 // cache depositMethods
                 if (!(code in this.options['depositMethods']))
-                    this.options['depositMethods'][code] = this.fetchDepositMethods (code);
+                    this.options['depositMethods'][code] = await this.fetchDepositMethods (code);
                 method = this.options['depositMethods'][code][0]['method'];
             } else {
                 throw new ExchangeError (this.id + ' fetchDepositAddress() requires an extra `method` parameter. Use fetchDepositMethods ("' + code + '") to get a list of available deposit methods or enable the exchange property .options["cacheDepositMethodsOnFetchDepositAddress"] = true');

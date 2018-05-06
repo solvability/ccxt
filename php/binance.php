@@ -257,6 +257,7 @@ class binance extends Exchange {
             ),
             // exchange-specific options
             'options' => array (
+                'hasAlreadyAuthenticatedSuccessfully' => false,
                 'warnOnFetchOpenOrdersWithoutSymbol' => true,
                 'recvWindow' => 5 * 1000, // 5 sec, binance default
                 'timeDifference' => 0, // the difference between system clock and Binance clock
@@ -342,17 +343,17 @@ class binance extends Exchange {
                 $filter = $filters['PRICE_FILTER'];
                 $entry['precision']['price'] = $this->precision_from_string($filter['tickSize']);
                 $entry['limits']['price'] = array (
-                    'min' => floatval ($filter['minPrice']),
-                    'max' => floatval ($filter['maxPrice']),
+                    'min' => $this->safe_float($filter, 'minPrice'),
+                    'max' => $this->safe_float($filter, 'maxPrice'),
                 );
             }
             if (is_array ($filters) && array_key_exists ('LOT_SIZE', $filters)) {
                 $filter = $filters['LOT_SIZE'];
                 $entry['precision']['amount'] = $this->precision_from_string($filter['stepSize']);
-                $entry['lot'] = floatval ($filter['stepSize']); // $lot size is deprecated as of 2018.02.06
+                $entry['lot'] = $this->safe_float($filter, 'stepSize'); // $lot size is deprecated as of 2018.02.06
                 $entry['limits']['amount'] = array (
-                    'min' => floatval ($filter['minQty']),
-                    'max' => floatval ($filter['maxQty']),
+                    'min' => $this->safe_float($filter, 'minQty'),
+                    'max' => $this->safe_float($filter, 'maxQty'),
                 );
             }
             if (is_array ($filters) && array_key_exists ('MIN_NOTIONAL', $filters)) {
@@ -485,16 +486,17 @@ class binance extends Exchange {
         ];
     }
 
-    public function fetch_ohlcv ($symbol, $timeframe = '1m', $since = null, $limit = 500, $params = array ()) {
+    public function fetch_ohlcv ($symbol, $timeframe = '1m', $since = null, $limit = null, $params = array ()) {
         $this->load_markets();
         $market = $this->market ($symbol);
         $request = array (
             'symbol' => $market['id'],
             'interval' => $this->timeframes[$timeframe],
-            'limit' => $limit, // default == max == 500
         );
         if ($since !== null)
             $request['startTime'] = $since;
+        if ($limit !== null)
+            $request['limit'] = $limit; // default == max == 500
         $response = $this->publicGetKlines (array_merge ($request, $params));
         return $this->parse_ohlcvs($response, $market, $timeframe, $since, $limit);
     }
@@ -520,10 +522,13 @@ class binance extends Exchange {
         $fee = null;
         if (is_array ($trade) && array_key_exists ('commission', $trade)) {
             $fee = array (
-                'cost' => floatval ($trade['commission']),
+                'cost' => $this->safe_float($trade, 'commission'),
                 'currency' => $this->common_currency_code($trade['commissionAsset']),
             );
         }
+        $takerOrMaker = null;
+        if (is_array ($trade) && array_key_exists ('isMaker', $trade))
+            $takerOrMaker = $trade['isMaker'] ? 'maker' : 'taker';
         return array (
             'info' => $trade,
             'timestamp' => $timestamp,
@@ -532,6 +537,7 @@ class binance extends Exchange {
             'id' => $id,
             'order' => $order,
             'type' => null,
+            'takerOrMaker' => $takerOrMaker,
             'side' => $side,
             'price' => $price,
             'cost' => $price * $amount,
@@ -861,6 +867,12 @@ class binance extends Exchange {
                 if ($error !== null) {
                     $exceptions = $this->exceptions;
                     if (is_array ($exceptions) && array_key_exists ($error, $exceptions)) {
+                        // a workaround for array ("$code":-2015,"msg":"Invalid API-key, IP, or permissions for action.")
+                        // despite that their message is very confusing, it is raised by Binance
+                        // on a temporary ban (the API key is valid, but disabled for a while)
+                        if (($error === '-2015') && $this->options['hasAlreadyAuthenticatedSuccessfully']) {
+                            throw new DDoSProtection ($this->id . ' temporary banned => ' . $body);
+                        }
                         throw new $exceptions[$error] ($this->id . ' ' . $body);
                     } else {
                         throw new ExchangeError ($this->id . ' => unknown $error $code => ' . $body . ' ' . $error);
@@ -871,5 +883,13 @@ class binance extends Exchange {
                 }
             }
         }
+    }
+
+    public function request ($path, $api = 'public', $method = 'GET', $params = array (), $headers = null, $body = null) {
+        $response = $this->fetch2 ($path, $api, $method, $params, $headers, $body);
+        // a workaround for array ("code":-2015,"msg":"Invalid API-key, IP, or permissions for action.")
+        if (($api === 'private') || ($api === 'wapi'))
+            $this->options['hasAlreadyAuthenticatedSuccessfully'] = true;
+        return $response;
     }
 }
