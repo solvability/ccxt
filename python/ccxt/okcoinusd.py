@@ -277,6 +277,11 @@ class okcoinusd (Exchange):
         }
 
     def fetch_ticker(self, symbol, params={}):
+        '''
+        :param symbol: spot example: EOS/USDT, future example:EOS/USD
+        :param params:
+        :return:
+        '''
         self.load_markets()
         market = self.market(symbol)
         method = 'publicGet'
@@ -366,6 +371,60 @@ class okcoinusd (Exchange):
             account['total'] = self.sum(account['free'], account['used'])
             result[code] = account
         return self.parse_balance(result)
+
+    def fetch_future_balance(self, params={}):
+        '''
+        :param params:
+        :return: example retern val:
+        {'bch': {'account_rights': 0,
+          'keep_deposit': 0,
+          'profit_real': 0,
+          'profit_unreal': 0,
+          'risk_rate': 10000},
+         'btc': {'account_rights': 0,
+          'keep_deposit': 0,
+          'profit_real': 0,
+          'profit_unreal': 0,
+          'risk_rate': 10000},
+          ...
+         }
+        '''
+        self.load_markets()
+        response = self.privatePostFutureUserinfo()
+        return response['info']
+
+    def fetch_future_position(self, symbol, contract_type=None):
+        '''
+        :param symbol:  EOS/USD or eos_usd
+        :param contract_type: this_week, next_week, quarter. If None, return all.
+        :return: example return val:
+        {'force_liqu_price': '0.000',
+         'holding': [{'buy_amount': 0,
+                      'buy_available': 0,
+                      'buy_price_avg': 0,
+                      'buy_price_cost': 0,
+                      'buy_profit_real': 0,
+                      'contract_id': 201805110200054,
+                      'contract_type': 'this_week',
+                      'create_date': 1525392600000,
+                      'lever_rate': 10,
+                      'sell_amount': 4000,
+                      'sell_available': 4000,
+                      'sell_price_avg': 18.0483803,
+                      'sell_price_cost': 17.90034047,
+                      'sell_profit_real': -0.41249864,
+                      'symbol': 'eos_usd'}],
+         'result': True}
+        '''
+        self.load_markets()
+        # for uniformality, allow EOS/USD
+        if '/' in symbol:
+            symbol = '_'.join([x.lower() for x in symbol.split('/')])
+        params = {'symbol':symbol}
+        if contract_type != None:
+            params['contract_type'] = contract_type
+        response = self.privatePostFuturePosition(params=params)
+        return response
 
     def create_order(self, symbol, type, side, amount, price=None, params={}):
         self.load_markets()
