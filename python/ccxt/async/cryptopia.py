@@ -39,7 +39,7 @@ class cryptopia (Exchange):
             'urls': {
                 'logo': 'https://user-images.githubusercontent.com/1294454/29484394-7b4ea6e2-84c6-11e7-83e5-1fccf4b2dc81.jpg',
                 'api': 'https://www.cryptopia.co.nz/api',
-                'www': 'https://www.cryptopia.co.nz',
+                'www': 'https://www.cryptopia.co.nz/Register?referrer=kroitor',
                 'doc': [
                     'https://www.cryptopia.co.nz/Forum/Category/45',
                     'https://www.cryptopia.co.nz/Forum/Thread/255',
@@ -406,29 +406,28 @@ class cryptopia (Exchange):
             raise ExchangeError(self.id + ' createOrder returned unknown error: ' + self.json(response))
         id = None
         filled = 0.0
+        status = 'open'
         if 'Data' in response:
             if 'OrderId' in response['Data']:
                 if response['Data']['OrderId']:
                     id = str(response['Data']['OrderId'])
-            if 'FilledOrders' in response['Data']:
-                filledOrders = response['Data']['FilledOrders']
-                filledOrdersLength = len(filledOrders)
-                if filledOrdersLength:
-                    filled = None
+                else:
+                    filled = amount
+                    status = 'closed'
         timestamp = self.milliseconds()
         order = {
             'id': id,
             'timestamp': timestamp,
             'datetime': self.iso8601(timestamp),
             'lastTradeTimestamp': None,
-            'status': 'open',
+            'status': status,
             'symbol': symbol,
             'type': type,
             'side': side,
             'price': price,
             'cost': price * amount,
             'amount': amount,
-            'remaining': amount,
+            'remaining': amount - filled,
             'filled': filled,
             'fee': None,
             # 'trades': self.parse_trades(order['trades'], market),
@@ -520,12 +519,13 @@ class cryptopia (Exchange):
             else:
                 order = self.orders[id]
                 if order['status'] == 'open':
-                    self.orders[id] = self.extend(order, {
-                        'status': 'closed',
-                        'cost': order['amount'] * order['price'],
-                        'filled': order['amount'],
-                        'remaining': 0.0,
-                    })
+                    if (symbol is None) or (order['symbol'] == symbol):
+                        self.orders[id] = self.extend(order, {
+                            'status': 'closed',
+                            'cost': order['amount'] * order['price'],
+                            'filled': order['amount'],
+                            'remaining': 0.0,
+                        })
             order = self.orders[id]
             if (symbol is None) or (order['symbol'] == symbol):
                 result.append(order)

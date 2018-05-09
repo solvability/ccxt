@@ -33,7 +33,7 @@ class cryptopia extends Exchange {
             'urls' => array (
                 'logo' => 'https://user-images.githubusercontent.com/1294454/29484394-7b4ea6e2-84c6-11e7-83e5-1fccf4b2dc81.jpg',
                 'api' => 'https://www.cryptopia.co.nz/api',
-                'www' => 'https://www.cryptopia.co.nz',
+                'www' => 'https://www.cryptopia.co.nz/Register?referrer=kroitor',
                 'doc' => array (
                     'https://www.cryptopia.co.nz/Forum/Category/45',
                     'https://www.cryptopia.co.nz/Forum/Thread/255',
@@ -428,17 +428,14 @@ class cryptopia extends Exchange {
             throw new ExchangeError ($this->id . ' createOrder returned unknown error => ' . $this->json ($response));
         $id = null;
         $filled = 0.0;
+        $status = 'open';
         if (is_array ($response) && array_key_exists ('Data', $response)) {
             if (is_array ($response['Data']) && array_key_exists ('OrderId', $response['Data'])) {
                 if ($response['Data']['OrderId']) {
                     $id = (string) $response['Data']['OrderId'];
-                }
-            }
-            if (is_array ($response['Data']) && array_key_exists ('FilledOrders', $response['Data'])) {
-                $filledOrders = $response['Data']['FilledOrders'];
-                $filledOrdersLength = is_array ($filledOrders) ? count ($filledOrders) : 0;
-                if ($filledOrdersLength) {
-                    $filled = null;
+                } else {
+                    $filled = $amount;
+                    $status = 'closed';
                 }
             }
         }
@@ -448,14 +445,14 @@ class cryptopia extends Exchange {
             'timestamp' => $timestamp,
             'datetime' => $this->iso8601 ($timestamp),
             'lastTradeTimestamp' => null,
-            'status' => 'open',
+            'status' => $status,
             'symbol' => $symbol,
             'type' => $type,
             'side' => $side,
             'price' => $price,
             'cost' => $price * $amount,
             'amount' => $amount,
-            'remaining' => $amount,
+            'remaining' => $amount - $filled,
             'filled' => $filled,
             'fee' => null,
             // 'trades' => $this->parse_trades($order['trades'], $market),
@@ -559,12 +556,14 @@ class cryptopia extends Exchange {
             } else {
                 $order = $this->orders[$id];
                 if ($order['status'] === 'open') {
-                    $this->orders[$id] = array_merge ($order, array (
-                        'status' => 'closed',
-                        'cost' => $order['amount'] * $order['price'],
-                        'filled' => $order['amount'],
-                        'remaining' => 0.0,
-                    ));
+                    if (($symbol === null) || ($order['symbol'] === $symbol)) {
+                        $this->orders[$id] = array_merge ($order, array (
+                            'status' => 'closed',
+                            'cost' => $order['amount'] * $order['price'],
+                            'filled' => $order['amount'],
+                            'remaining' => 0.0,
+                        ));
+                    }
                 }
             }
             $order = $this->orders[$id];

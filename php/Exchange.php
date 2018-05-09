@@ -30,7 +30,7 @@ SOFTWARE.
 
 namespace ccxt;
 
-$version = '1.13.95';
+$version = '1.13.108';
 
 // rounding mode
 const TRUNCATE = 0;
@@ -99,6 +99,7 @@ abstract class Exchange {
         'coinone',
         'coinsecure',
         'coinspot',
+        'cointiger',
         'coolcoin',
         'cryptopia',
         'dsx',

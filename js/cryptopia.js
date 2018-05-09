@@ -32,7 +32,7 @@ module.exports = class cryptopia extends Exchange {
             'urls': {
                 'logo': 'https://user-images.githubusercontent.com/1294454/29484394-7b4ea6e2-84c6-11e7-83e5-1fccf4b2dc81.jpg',
                 'api': 'https://www.cryptopia.co.nz/api',
-                'www': 'https://www.cryptopia.co.nz',
+                'www': 'https://www.cryptopia.co.nz/Register?referrer=kroitor',
                 'doc': [
                     'https://www.cryptopia.co.nz/Forum/Category/45',
                     'https://www.cryptopia.co.nz/Forum/Thread/255',
@@ -427,17 +427,14 @@ module.exports = class cryptopia extends Exchange {
             throw new ExchangeError (this.id + ' createOrder returned unknown error: ' + this.json (response));
         let id = undefined;
         let filled = 0.0;
+        let status = 'open';
         if ('Data' in response) {
             if ('OrderId' in response['Data']) {
                 if (response['Data']['OrderId']) {
                     id = response['Data']['OrderId'].toString ();
-                }
-            }
-            if ('FilledOrders' in response['Data']) {
-                let filledOrders = response['Data']['FilledOrders'];
-                let filledOrdersLength = filledOrders.length;
-                if (filledOrdersLength) {
-                    filled = undefined;
+                } else {
+                    filled = amount;
+                    status = 'closed';
                 }
             }
         }
@@ -447,14 +444,14 @@ module.exports = class cryptopia extends Exchange {
             'timestamp': timestamp,
             'datetime': this.iso8601 (timestamp),
             'lastTradeTimestamp': undefined,
-            'status': 'open',
+            'status': status,
             'symbol': symbol,
             'type': type,
             'side': side,
             'price': price,
             'cost': price * amount,
             'amount': amount,
-            'remaining': amount,
+            'remaining': amount - filled,
             'filled': filled,
             'fee': undefined,
             // 'trades': this.parseTrades (order['trades'], market),
@@ -558,12 +555,14 @@ module.exports = class cryptopia extends Exchange {
             } else {
                 let order = this.orders[id];
                 if (order['status'] === 'open') {
-                    this.orders[id] = this.extend (order, {
-                        'status': 'closed',
-                        'cost': order['amount'] * order['price'],
-                        'filled': order['amount'],
-                        'remaining': 0.0,
-                    });
+                    if ((typeof symbol === 'undefined') || (order['symbol'] === symbol)) {
+                        this.orders[id] = this.extend (order, {
+                            'status': 'closed',
+                            'cost': order['amount'] * order['price'],
+                            'filled': order['amount'],
+                            'remaining': 0.0,
+                        });
+                    }
                 }
             }
             let order = this.orders[id];
