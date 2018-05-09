@@ -435,6 +435,8 @@ class bitfinex (Exchange):
         return result
 
     def fetch_ticker(self, symbol, params={}):
+        if symbol.endswith('/USDT'):
+            symbol = symbol.replace('/USDT','/USD')
         self.load_markets()
         market = self.market(symbol)
         ticker = self.publicGetPubtickerSymbol(self.extend({
