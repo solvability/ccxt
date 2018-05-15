@@ -256,6 +256,7 @@ class bitfinex extends Exchange {
                 'QTM' => 'QTUM',
                 'SNG' => 'SNGLS',
                 'SPK' => 'SPANK',
+                'STJ' => 'STORJ',
                 'YYW' => 'YOYOW',
             ),
             'exceptions' => array (
@@ -675,8 +676,6 @@ class bitfinex extends Exchange {
         $this->load_markets();
         if ($limit === null)
             $limit = 100;
-        if ($since === null)
-            $since = $this->milliseconds () - $this->parse_timeframe($timeframe) * $limit * 1000;
         $market = $this->market ($symbol);
         $v2id = 't' . $market['id'];
         $request = array (
@@ -684,8 +683,9 @@ class bitfinex extends Exchange {
             'timeframe' => $this->timeframes[$timeframe],
             'sort' => 1,
             'limit' => $limit,
-            'start' => $since,
         );
+        if ($since !== null)
+            $request['start'] = $since;
         $response = $this->v2GetCandlesTradeTimeframeSymbolHist (array_merge ($request, $params));
         return $this->parse_ohlcvs($response, $market, $timeframe, $since, $limit);
     }

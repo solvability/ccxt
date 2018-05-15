@@ -646,7 +646,7 @@ class liqui extends Exchange {
                 'nonce' => $nonce,
                 'method' => $path,
             ), $query));
-            $signature = $this->sign_body_with_secret ($body);
+            $signature = $this->sign_body_with_secret($body);
             $headers = array (
                 'Content-Type' => 'application/x-www-form-urlencoded',
                 'Key' => $this->apiKey,
@@ -739,11 +739,11 @@ class liqui extends Exchange {
                     } else if ($message === 'Requests too often') {
                         throw new DDoSProtection ($feedback);
                     } else if ($message === 'not available') {
-                        throw new DDoSProtection ($feedback);
+                        throw new ExchangeNotAvailable ($feedback);
                     } else if ($message === 'data unavailable') {
-                        throw new DDoSProtection ($feedback);
+                        throw new ExchangeNotAvailable ($feedback);
                     } else if ($message === 'external service unavailable') {
-                        throw new DDoSProtection ($feedback);
+                        throw new ExchangeNotAvailable ($feedback);
                     } else {
                         throw new ExchangeError ($this->id . ' unknown "error" value => ' . $this->json ($response));
                     }

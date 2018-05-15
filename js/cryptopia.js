@@ -89,6 +89,9 @@ module.exports = class cryptopia extends Exchange {
                 'QBT': 'Cubits',
                 'WRC': 'WarCoin',
             },
+            'options': {
+                'fetchTickersErrors': true,
+            },
         });
     }
 
@@ -253,11 +256,14 @@ module.exports = class cryptopia extends Exchange {
             let ticker = tickers[i];
             let id = ticker['TradePairId'];
             let recognized = (id in this.markets_by_id);
-            if (!recognized)
-                throw new ExchangeError (this.id + ' fetchTickers() returned unrecognized pair id ' + id.toString ());
-            let market = this.markets_by_id[id];
-            let symbol = market['symbol'];
-            result[symbol] = this.parseTicker (ticker, market);
+            if (!recognized) {
+                if (this.options['fetchTickersErrors'])
+                    throw new ExchangeError (this.id + ' fetchTickers() returned unrecognized pair id ' + id.toString ());
+            } else {
+                let market = this.markets_by_id[id];
+                let symbol = market['symbol'];
+                result[symbol] = this.parseTicker (ticker, market);
+            }
         }
         return this.filterByArray (result, 'symbol', symbols);
     }
@@ -389,7 +395,7 @@ module.exports = class cryptopia extends Exchange {
 
     async fetchBalance (params = {}) {
         await this.loadMarkets ();
-        let response = await this.privatePostGetBalance ();
+        let response = await this.privatePostGetBalance (params);
         let balances = response['Data'];
         let result = { 'info': response };
         for (let i = 0; i < balances.length; i++) {
@@ -669,8 +675,11 @@ module.exports = class cryptopia extends Exchange {
                 if (response['Success']) {
                     return response;
                 } else if ('Error' in response) {
-                    if (response['Error'] === 'Insufficient Funds.')
-                        throw new InsufficientFunds (this.id + ' ' + this.json (response));
+                    let error = this.safeString (response, 'error');
+                    if (typeof error !== 'undefined') {
+                        if (error.indexOf ('Insufficient Funds') >= 0)
+                            throw new InsufficientFunds (this.id + ' ' + this.json (response));
+                    }
                 }
         }
         throw new ExchangeError (this.id + ' ' + this.json (response));

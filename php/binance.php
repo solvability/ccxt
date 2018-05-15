@@ -257,6 +257,7 @@ class binance extends Exchange {
             ),
             // exchange-specific options
             'options' => array (
+                'defaultLimitOrderType' => 'limit', // or 'limit_maker'
                 'hasAlreadyAuthenticatedSuccessfully' => false,
                 'warnOnFetchOpenOrdersWithoutSymbol' => true,
                 'recvWindow' => 5 * 1000, // 5 sec, binance default
@@ -264,6 +265,7 @@ class binance extends Exchange {
                 'adjustForTimeDifference' => false, // controls the adjustment logic upon instantiation
             ),
             'exceptions' => array (
+                '-1000' => '\\ccxt\\ExchangeNotAvailable', // array ("code":-1000,"msg":"An unknown error occured while processing the request.")
                 '-1013' => '\\ccxt\\InvalidOrder', // createOrder -> 'invalid quantity'/'invalid price'/MIN_NOTIONAL
                 '-1021' => '\\ccxt\\InvalidNonce', // 'your time is ahead of server'
                 '-1100' => '\\ccxt\\InvalidOrder', // createOrder(symbol, 1, asdf) -> 'Illegal characters found in parameter 'price'
@@ -644,6 +646,7 @@ class binance extends Exchange {
             'side' => strtoupper ($side),
         );
         if ($type === 'limit') {
+            $order['type'] = strtoupper ($this->options['defaultLimitOrderType']);
             $order = array_merge ($order, array (
                 'price' => $this->price_to_precision($symbol, $price),
                 'timeInForce' => 'GTC', // 'GTC' = Good To Cancel (default), 'IOC' = Immediate Or Cancel

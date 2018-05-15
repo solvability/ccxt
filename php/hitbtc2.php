@@ -1060,7 +1060,7 @@ class hitbtc2 extends hitbtc {
         $this->check_address($address);
         $tag = $this->safe_string($response, 'paymentId');
         return array (
-            'currency' => $currency,
+            'currency' => $currency.code,
             'address' => $address,
             'tag' => $tag,
             'status' => 'ok',
@@ -1114,7 +1114,13 @@ class hitbtc2 extends hitbtc {
     }
 
     public function handle_errors ($code, $reason, $url, $method, $headers, $body) {
-        if ($code === 400) {
+        if (gettype ($body) != 'string')
+            return;
+        if ($code >= 400) {
+            $feedback = $this->id . ' ' . $body;
+            // array ("$code":504,"$message":"Gateway Timeout","description":"")
+            if (($code === 503) || ($code === 504))
+                throw new ExchangeNotAvailable ($feedback);
             if ($body[0] === '{') {
                 $response = json_decode ($body, $as_associative_array = true);
                 if (is_array ($response) && array_key_exists ('error', $response)) {
@@ -1123,16 +1129,16 @@ class hitbtc2 extends hitbtc {
                         if ($message === 'Order not found') {
                             throw new OrderNotFound ($this->id . ' order not found in active orders');
                         } else if ($message === 'Quantity not a valid number') {
-                            throw new InvalidOrder ($this->id . ' ' . $body);
+                            throw new InvalidOrder ($feedback);
                         } else if ($message === 'Insufficient funds') {
-                            throw new InsufficientFunds ($this->id . ' ' . $body);
+                            throw new InsufficientFunds ($feedback);
                         } else if ($message === 'Duplicate clientOrderId') {
-                            throw new InvalidOrder ($this->id . ' ' . $body);
+                            throw new InvalidOrder ($feedback);
                         }
                     }
                 }
             }
-            throw new ExchangeError ($this->id . ' ' . $body);
+            throw new ExchangeError ($feedback);
         }
     }
 }

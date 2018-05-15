@@ -90,6 +90,9 @@ class cryptopia extends Exchange {
                 'QBT' => 'Cubits',
                 'WRC' => 'WarCoin',
             ),
+            'options' => array (
+                'fetchTickersErrors' => true,
+            ),
         ));
     }
 
@@ -254,11 +257,14 @@ class cryptopia extends Exchange {
             $ticker = $tickers[$i];
             $id = $ticker['TradePairId'];
             $recognized = (is_array ($this->markets_by_id) && array_key_exists ($id, $this->markets_by_id));
-            if (!$recognized)
-                throw new ExchangeError ($this->id . ' fetchTickers() returned unrecognized pair $id ' . (string) $id);
-            $market = $this->markets_by_id[$id];
-            $symbol = $market['symbol'];
-            $result[$symbol] = $this->parse_ticker($ticker, $market);
+            if (!$recognized) {
+                if ($this->options['fetchTickersErrors'])
+                    throw new ExchangeError ($this->id . ' fetchTickers() returned unrecognized pair $id ' . (string) $id);
+            } else {
+                $market = $this->markets_by_id[$id];
+                $symbol = $market['symbol'];
+                $result[$symbol] = $this->parse_ticker($ticker, $market);
+            }
         }
         return $this->filter_by_array($result, 'symbol', $symbols);
     }
@@ -390,7 +396,7 @@ class cryptopia extends Exchange {
 
     public function fetch_balance ($params = array ()) {
         $this->load_markets();
-        $response = $this->privatePostGetBalance ();
+        $response = $this->privatePostGetBalance ($params);
         $balances = $response['Data'];
         $result = array ( 'info' => $response );
         for ($i = 0; $i < count ($balances); $i++) {
@@ -670,8 +676,11 @@ class cryptopia extends Exchange {
                 if ($response['Success']) {
                     return $response;
                 } else if (is_array ($response) && array_key_exists ('Error', $response)) {
-                    if ($response['Error'] === 'Insufficient Funds.')
-                        throw new InsufficientFunds ($this->id . ' ' . $this->json ($response));
+                    $error = $this->safe_string($response, 'error');
+                    if ($error !== null) {
+                        if (mb_strpos ($error, 'Insufficient Funds') !== false)
+                            throw new InsufficientFunds ($this->id . ' ' . $this->json ($response));
+                    }
                 }
         }
         throw new ExchangeError ($this->id . ' ' . $this->json ($response));

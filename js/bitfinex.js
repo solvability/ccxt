@@ -256,6 +256,7 @@ module.exports = class bitfinex extends Exchange {
                 'QTM': 'QTUM',
                 'SNG': 'SNGLS',
                 'SPK': 'SPANK',
+                'STJ': 'STORJ',
                 'YYW': 'YOYOW',
             },
             'exceptions': {
@@ -675,8 +676,6 @@ module.exports = class bitfinex extends Exchange {
         await this.loadMarkets ();
         if (typeof limit === 'undefined')
             limit = 100;
-        if (typeof since === 'undefined')
-            since = this.milliseconds () - this.parseTimeframe (timeframe) * limit * 1000;
         let market = this.market (symbol);
         let v2id = 't' + market['id'];
         let request = {
@@ -684,8 +683,9 @@ module.exports = class bitfinex extends Exchange {
             'timeframe': this.timeframes[timeframe],
             'sort': 1,
             'limit': limit,
-            'start': since,
         };
+        if (typeof since !== 'undefined')
+            request['start'] = since;
         let response = await this.v2GetCandlesTradeTimeframeSymbolHist (this.extend (request, params));
         return this.parseOHLCVs (response, market, timeframe, since, limit);
     }

@@ -178,6 +178,8 @@ class okcoinusd extends Exchange {
             $minAmount = $markets[$i]['minTradeSize'];
             $minPrice = pow (10, -$precision['price']);
             $active = ($markets[$i]['online'] !== 0);
+            $baseNumericId = $markets[$i]['baseCurrency'];
+            $quoteNumericId = $markets[$i]['quoteCurrency'];
             $market = array_merge ($this->fees['trading'], array (
                 'id' => $id,
                 'symbol' => $symbol,
@@ -185,6 +187,8 @@ class okcoinusd extends Exchange {
                 'quote' => $quote,
                 'baseId' => $baseId,
                 'quoteId' => $quoteId,
+                'baseNumericId' => $baseNumericId,
+                'quoteNumericId' => $quoteNumericId,
                 'info' => $markets[$i],
                 'type' => 'spot',
                 'spot' => true,
@@ -518,9 +522,12 @@ class okcoinusd extends Exchange {
         $createDateField = $this->get_create_date_field ();
         if (is_array ($order) && array_key_exists ($createDateField, $order))
             $timestamp = $order[$createDateField];
-        $amount = $order['amount'];
-        $filled = $order['deal_amount'];
+        $amount = $this->safe_float($order, 'amount');
+        $filled = $this->safe_float($order, 'deal_amount');
         $remaining = $amount - $filled;
+        if ($type === 'market') {
+            $remaining = 0;
+        }
         $average = $this->safe_float($order, 'avg_price');
         // https://github.com/ccxt/ccxt/issues/2452
         $average = $this->safe_float($order, 'price_avg', $average);

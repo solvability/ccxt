@@ -96,6 +96,9 @@ class cryptopia (Exchange):
                 'QBT': 'Cubits',
                 'WRC': 'WarCoin',
             },
+            'options': {
+                'fetchTickersErrors': True,
+            },
         })
 
     def fetch_markets(self):
@@ -249,10 +252,12 @@ class cryptopia (Exchange):
             id = ticker['TradePairId']
             recognized = (id in list(self.markets_by_id.keys()))
             if not recognized:
-                raise ExchangeError(self.id + ' fetchTickers() returned unrecognized pair id ' + str(id))
-            market = self.markets_by_id[id]
-            symbol = market['symbol']
-            result[symbol] = self.parse_ticker(ticker, market)
+                if self.options['fetchTickersErrors']:
+                    raise ExchangeError(self.id + ' fetchTickers() returned unrecognized pair id ' + str(id))
+            else:
+                market = self.markets_by_id[id]
+                symbol = market['symbol']
+                result[symbol] = self.parse_ticker(ticker, market)
         return self.filter_by_array(result, 'symbol', symbols)
 
     def parse_trade(self, trade, market=None):
@@ -370,7 +375,7 @@ class cryptopia (Exchange):
 
     def fetch_balance(self, params={}):
         self.load_markets()
-        response = self.privatePostGetBalance()
+        response = self.privatePostGetBalance(params)
         balances = response['Data']
         result = {'info': response}
         for i in range(0, len(balances)):
@@ -618,6 +623,8 @@ class cryptopia (Exchange):
                 if response['Success']:
                     return response
                 elif 'Error' in response:
-                    if response['Error'] == 'Insufficient Funds.':
-                        raise InsufficientFunds(self.id + ' ' + self.json(response))
+                    error = self.safe_string(response, 'error')
+                    if error is not None:
+                        if error.find('Insufficient Funds') >= 0:
+                            raise InsufficientFunds(self.id + ' ' + self.json(response))
         raise ExchangeError(self.id + ' ' + self.json(response))
