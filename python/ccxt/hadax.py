@@ -32,8 +32,56 @@ class hadax (huobipro):
                         'hadax/settings/currencys',  # ?language=en-US
                     ],
                 },
+                'private': {
+                    'get': [
+                        'account/accounts',  # 查询当前用户的所有账户(即account-id)
+                        'hadax/account/accounts/{id}/balance',  # 查询指定账户的余额
+                    ]
+                }
             },
             'options': {
                 'fetchMarketsMethod': 'publicGetHadaxCommonSymbols',
             },
         })
+
+    def load_accounts(self, reload=False):
+        if reload:
+            self.accounts = self.fetch_accounts()
+        else:
+            if self.accounts:
+                return self.accounts
+            else:
+                self.accounts = self.fetch_accounts()
+                self.accountsById = self.index_by(self.accounts, 'id')
+        return self.accounts
+
+    def fetch_accounts(self):
+        self.load_markets()
+        response = self.privateGetAccountAccounts()
+        return response['data']
+
+    def fetch_balance(self, params={}):
+        # Note that these four tokens ['HT', 'BTC', 'USDT', 'ETH'] shows up in both huobipro balance and hadax balance
+        self.load_markets()
+        self.load_accounts()
+        response = self.privateGetHadaxAccountAccountsIdBalance(self.extend({
+            'id': self.accounts[0]['id'],
+        }, params))
+        balances = response['data']['list']
+        result = {'info': response}
+        for i in range(0, len(balances)):
+            balance = balances[i]
+            uppercase = balance['currency'].upper()
+            currency = self.common_currency_code(uppercase)
+            account = None
+            if currency in result:
+                account = result[currency]
+            else:
+                account = self.account()
+            if balance['type'] == 'trade':
+                account['free'] = float(balance['balance'])
+            if balance['type'] == 'frozen':
+                account['used'] = float(balance['balance'])
+            account['total'] = self.sum(account['free'], account['used'])
+            result[currency] = account
+        return self.parse_balance(result)
