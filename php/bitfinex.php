@@ -559,10 +559,10 @@ class bitfinex extends Exchange {
         $orderType = $type;
         if (($type === 'limit') || ($type === 'market'))
             $orderType = 'exchange ' . $type;
-        // $amount = $this->amount_to_precision($symbol, $amount);
+        $amount = $this->amount_to_precision($symbol, $amount);
         $order = array (
             'symbol' => $this->market_id($symbol),
-            'amount' => (string) $amount,
+            'amount' => $amount,
             'side' => $side,
             'type' => $orderType,
             'ocoorder' => false,
@@ -572,8 +572,7 @@ class bitfinex extends Exchange {
         if ($type === 'market') {
             $order['price'] = (string) $this->nonce ();
         } else {
-            // $price = $this->price_to_precision($symbol, $price);
-            $order['price'] = (string) $price;
+            $order['price'] = $this->price_to_precision($symbol, $price);
         }
         $result = $this->privatePostOrderNew (array_merge ($order, $params));
         return $this->parse_order($result);
@@ -634,6 +633,9 @@ class bitfinex extends Exchange {
 
     public function fetch_open_orders ($symbol = null, $since = null, $limit = null, $params = array ()) {
         $this->load_markets();
+        if ($symbol !== null)
+            if (!(is_array ($this->markets) && array_key_exists ($symbol, $this->markets)))
+                throw new ExchangeError ($this->id . ' has no $symbol ' . $symbol);
         $response = $this->privatePostOrders ($params);
         $orders = $this->parse_orders($response, null, $since, $limit);
         if ($symbol)

@@ -51,8 +51,8 @@ class okcoinusd (Exchange):
             'api': {
                 'web': {
                     'get': [
-                        'markets/currencies',
-                        'markets/products',
+                        'spot/markets/currencies',
+                        'spot/markets/products',
                     ],
                 },
                 'public': {
@@ -154,7 +154,7 @@ class okcoinusd (Exchange):
         })
 
     def fetch_markets(self):
-        response = self.webGetMarketsProducts()
+        response = self.webGetSpotMarketsProducts()
         markets = response['data']
         result = []
         futureMarkets = {
@@ -337,6 +337,20 @@ class okcoinusd (Exchange):
         method += 'Trades'
         response = getattr(self, method)(self.extend(request, params))
         return self.parse_trades(response, market, since, limit)
+
+    def parse_ohlcv(self, ohlcv, market=None, timeframe='1m', since=None, limit=None):
+        numElements = len(ohlcv)
+        volumeIndex = 6 if (numElements > 6) else 5
+        return [
+            ohlcv[0],  # timestamp
+            ohlcv[1],  # Open
+            ohlcv[2],  # High
+            ohlcv[3],  # Low
+            ohlcv[4],  # Close
+            # ohlcv[5],  # quote volume
+            # ohlcv[6],  # base volume
+            ohlcv[volumeIndex],  # okex will return base volume in the 7th element for future markets
+        ]
 
     def fetch_ohlcv(self, symbol, timeframe='1m', since=None, limit=None, params={}):
         self.load_markets()
@@ -715,7 +729,9 @@ class okcoinusd (Exchange):
         url = '/'
         if api != 'web':
             url += self.version + '/'
-        url += path + self.extension
+        url += path
+        if api != 'web':
+            url += self.extension
         if api == 'private':
             self.check_required_credentials()
             query = self.keysort(self.extend({

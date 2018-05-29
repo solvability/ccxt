@@ -308,11 +308,11 @@ class bitz extends Exchange {
                 $side = $this->safe_string($order, 'flag');
         }
         $amount = $this->safe_float($order, 'number');
-        $filled = $this->safe_float($order, 'numberover');
-        $remaining = null;
+        $remaining = $this->safe_float($order, 'numberover');
+        $filled = null;
         if ($amount !== null)
-            if ($filled !== null)
-                $remaining = $amount - $filled;
+            if ($remaining !== null)
+                $filled = $amount - $remaining;
         $timestamp = null;
         $iso8601 = null;
         if (is_array ($order) && array_key_exists ('datetime', $order)) {
@@ -387,7 +387,7 @@ class bitz extends Exchange {
             $this->options['lastNonceTimestamp'] = $currentTimestamp;
             $this->options['lastNonce'] = 100000;
         }
-        $this->options['lastNonce'] .= 1;
+        $this->options['lastNonce'] = $this->sum ($this->options['lastNonce'], 1);
         return $this->options['lastNonce'];
     }
 

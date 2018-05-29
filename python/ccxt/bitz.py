@@ -298,11 +298,11 @@ class bitz (Exchange):
             if side is None:
                 side = self.safe_string(order, 'flag')
         amount = self.safe_float(order, 'number')
-        filled = self.safe_float(order, 'numberover')
-        remaining = None
+        remaining = self.safe_float(order, 'numberover')
+        filled = None
         if amount is not None:
-            if filled is not None:
-                remaining = amount - filled
+            if remaining is not None:
+                filled = amount - remaining
         timestamp = None
         iso8601 = None
         if 'datetime' in order:
@@ -371,7 +371,7 @@ class bitz (Exchange):
         if currentTimestamp > self.options['lastNonceTimestamp']:
             self.options['lastNonceTimestamp'] = currentTimestamp
             self.options['lastNonce'] = 100000
-        self.options['lastNonce'] += 1
+        self.options['lastNonce'] = self.sum(self.options['lastNonce'], 1)
         return self.options['lastNonce']
 
     def sign(self, path, api='public', method='GET', params={}, headers=None, body=None):
